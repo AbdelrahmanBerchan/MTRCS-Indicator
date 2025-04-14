@@ -1,0 +1,69 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © AB_berchan
+
+//@version=6
+indicator("Multi-Factor Trend & Reversal Confirmation System (MTRCS)", overlay=true)
+
+// Input parameters
+length = input.int(20, "Moving Average Length", minval=1)
+rsiLength = input.int(14, "RSI Length", minval=1)
+supportResistanceBars = input.int(50, "Support/Resistance Lookback", minval=10)
+
+// Calculate indicators
+ma = ta.sma(close, length)
+rsi = ta.rsi(close, rsiLength)
+
+// Trend detection
+isUptrend = close > ma and rsi > 50 and close > close[1]
+isDowntrend = close < ma and rsi < 50 and close < close[1]
+
+// Support and Resistance levels
+var float[] supportLevels = array.new_float()
+var float[] resistanceLevels = array.new_float()
+
+// Calculate highest and lowest values
+highest3 = ta.highest(high, 3)
+lowest3 = ta.lowest(low, 3)
+
+// Update support and resistance levels
+if barstate.islast
+    array.clear(supportLevels)
+    array.clear(resistanceLevels)
+    
+    for i = 0 to supportResistanceBars - 1
+        if lowest3 == low[i]
+            array.push(supportLevels, low[i])
+        if highest3 == high[i]
+            array.push(resistanceLevels, high[i])
+
+// Plotting
+plot(ma, "Moving Average", color=color.blue, linewidth=2)
+
+// Plot support and resistance levels
+if barstate.islast
+    for i = 0 to array.size(supportLevels) - 1
+        line.new(bar_index - supportResistanceBars, array.get(supportLevels, i), bar_index, array.get(supportLevels, i), color=color.new(color.green, 50), width=1, style=line.style_dashed)
+    
+    for i = 0 to array.size(resistanceLevels) - 1
+        line.new(bar_index - supportResistanceBars, array.get(resistanceLevels, i), bar_index, array.get(resistanceLevels, i), color=color.new(color.red, 50), width=1, style=line.style_dashed)
+
+// Plot trend signals
+plotshape(isUptrend and not isUptrend[1], "Uptrend Signal", shape.triangleup, location.belowbar, color.green, size=size.small)
+plotshape(isDowntrend and not isDowntrend[1], "Downtrend Signal", shape.triangledown, location.abovebar, color.red, size=size.small)
+
+// Display RSI value
+var label rsiLabel = na
+if barstate.islast
+    rsiLabel := label.new(bar_index, high, "RSI: " + str.tostring(rsi, "#.##"), color=color.new(color.white, 100), style=label.style_label_down, textcolor=color.white, size=size.small)
+
+// Alerts
+alertcondition(isUptrend and not isUptrend[1], "Uptrend Signal", "New Uptrend Detected")
+alertcondition(isDowntrend and not isDowntrend[1], "Downtrend Signal", "New Downtrend Detected")
+
+// Strategy recommendations
+var table strategyTable = table.new(position.top_right, 2, 2, bgcolor=color.new(color.black, 50))
+if barstate.islast
+    table.cell(strategyTable, 0, 0, "Current Trend", text_color=color.white)
+    table.cell(strategyTable, 1, 0, isUptrend ? "Uptrend" : isDowntrend ? "Downtrend" : "Sideways", text_color=isUptrend ? color.green : isDowntrend ? color.red : color.gray)
+    table.cell(strategyTable, 0, 1, "RSI", text_color=color.white)
+    table.cell(strategyTable, 1, 1, str.tostring(rsi, "#.##"), text_color=rsi > 70 ? color.red : rsi < 30 ? color.green : color.white) 
